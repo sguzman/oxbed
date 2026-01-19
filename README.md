@@ -1,5 +1,7 @@
 # Oxbed
 
+![Oxbed primary lockup](branding/oxbed-primary-lockup.png)
+
 Oxbed is a text analysis + embedding research platform that begins with a clean, layer-by-layer pipeline and scales toward knowledge extraction, custom embedding training, and RAG workflows. The repository stores the foundations of a “text swiss-army knife”: metadata-aware ingestion, configurable chunking, vector indexing, search, and instrumentation that lets you evaluate and swap embedding models without revamping the surrounding infrastructure.
 
 ## Ambition
@@ -35,3 +37,11 @@ Release & contribution processes follow `docs/RELEASE.md` and `docs/ai/RUST.md`:
 
 - Implement the ingestion + chunking + query path described in Stage 1 so the CLI and vector store can deliver meaningful search results.
 - Once Stage 1 is stable (v1.0.0), iterate through the later stages documented in `ROADMAP.md`, using the evaluation harness, rerankers, and custom embedder workflows to advance the platform.
+
+## Branding
+
+- The full-color visual lockup (`branding/oxbed-primary-lockup.png`) sets the tone—use it at the top of documents and marketing materials to show the playful Rust crab quickly settling onto a bed.
+- The monomark version (`branding/oxbed-monomark.png`) is a simplified abstract that works well in footers, badges, or any place where a smaller, monochrome graphic is preferable (for example, it appears at the bottom of this README).
+- Text-based variants live in `branding/dev.txt` (two-line version), `branding/tight.txt` (exact textual logo without spacing), and `branding/compact.txt` (single-line form); embed them in terminal UIs, release notes, or README subsections that benefit from ASCII flair.
+
+![Oxbed monomark](branding/oxbed-monomark.png)
