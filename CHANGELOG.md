@@ -2,6 +2,9 @@
 ## [Unreleased]
 
 ### 📚 Documentation
+- Roadmap ([8b4a582](https://github.com/sguzman/oxbed/commit/8b4a58299422fc8e43712d30a455978509323975))## [0.1.2] - 2026-01-19
+
+### 📚 Documentation
 - Add template files ([3953304](https://github.com/sguzman/oxbed/commit/3953304981924d308c845cc650f2ad21dd0d1a31))## [0.1.1] - 2026-01-19
 
 ### ⚙️ Miscellaneous
