@@ -58,7 +58,14 @@ embedder_kinds = ["tf", "bag-of-words"]
 queries = [
   { name = "Ishmael recall", query = "call me ishmael", expected_terms = ["ishmael", "call me"] },
   { name = "Whale description", query = "white whale", expected_terms = ["whale", "white"] },
-  { name = "Nantucket mention", query = "nantucket harbor", expected_terms = ["nantucket", "harbor"] }
+  { name = "Nantucket mention", query = "nantucket harbor", expected_terms = ["nantucket", "harbor"] },
+  { name = "First mate", query = "first mate starbuck", expected_terms = ["mate", "starbuck"] },
+  { name = "Pequod ship", query = "pequod crew", expected_terms = ["pequod", "crew"] },
+  { name = "Captain Ahab", query = "captain ahab obsession", expected_terms = ["ahab", "captain"] },
+  { name = "Ishmael narrator", query = "i, ishmael", expected_terms = ["ishmael", "i"] },
+  { name = "Harpooner", query = "queer harpooner", expected_terms = ["harpooner"] },
+  { name = "Try pots", query = "try pots whales", expected_terms = ["pot", "whale"] },
+  { name = "Queequeg tattoo", query = "queeg tattoo", expected_terms = ["queequeg", "tattoo"] }
 ]
 
 [stage3]
