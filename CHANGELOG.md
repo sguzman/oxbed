@@ -1,6 +1,12 @@
 # Changelog
 ## [Unreleased]
 
+### 🚀 Features
+- Add example files ([18792f8](https://github.com/sguzman/oxbed/commit/18792f8272fbea9963399bda8c44d99fb2b15d8c))
+
+### 🧪 Testing
+- Add stage1 pipeline coverage ([a58d914](https://github.com/sguzman/oxbed/commit/a58d914bd0778891c2ab99906642827ace7908f1))## [0.2.0] - 2026-01-20
+
 ### ⚙️ Miscellaneous
 - Branding ([2691a96](https://github.com/sguzman/oxbed/commit/2691a96928a4b6e2835616bbcb7519f36016e39a))
 - Libs ([614efb7](https://github.com/sguzman/oxbed/commit/614efb7536d00a1643ad4d4096e6f08d99a4d0e2))
