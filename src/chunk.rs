@@ -49,8 +49,12 @@ mod tests {
   #[test]
   fn structured_chunks_split_paragraphs_and_dedup()
    {
-    let chunker = Chunker::new(
-      ChunkStrategy::Structured
+    let chunker = Chunker::with_config(
+      ChunkStrategy::Structured,
+      200,
+      32,
+      true,
+      true
     );
     let input =
       "alpha\n\nbeta\n\nalpha";
@@ -68,8 +72,12 @@ mod tests {
   #[test]
   fn fixed_chunks_obey_overlap_and_max()
   {
-    let chunker = Chunker::new(
-      ChunkStrategy::Fixed
+    let chunker = Chunker::with_config(
+      ChunkStrategy::Fixed,
+      200,
+      32,
+      true,
+      true
     );
     let input = "word ".repeat(500);
     let chunks =
@@ -112,14 +120,6 @@ pub struct Chunker {
 }
 
 impl Chunker {
-  pub fn new(
-    strategy: ChunkStrategy
-  ) -> Self {
-    Self::with_config(
-      strategy, 200, 32, true, true
-    )
-  }
-
   pub fn with_config(
     strategy: ChunkStrategy,
     max_tokens: usize,
