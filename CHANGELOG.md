@@ -1,6 +1,17 @@
 # Changelog
 ## [Unreleased]
 
+### ⚙️ Miscellaneous
+- Branding ([2691a96](https://github.com/sguzman/oxbed/commit/2691a96928a4b6e2835616bbcb7519f36016e39a))
+- Libs ([614efb7](https://github.com/sguzman/oxbed/commit/614efb7536d00a1643ad4d4096e6f08d99a4d0e2))
+
+### 📚 Documentation
+- Readme ([054b24f](https://github.com/sguzman/oxbed/commit/054b24f257d8f3c96218b35653f03f10c4aa1654))
+
+### 🚀 Features
+- Branding ([f973030](https://github.com/sguzman/oxbed/commit/f9730300dc2d660cad410dd50ba5a0120096ae59))
+- Add stage1 ingestion and query pipeline ([adeee4d](https://github.com/sguzman/oxbed/commit/adeee4dcb7a30dc307ddda7916cbfb58a9bbe5e0))## [0.1.3] - 2026-01-19
+
 ### 📚 Documentation
 - Roadmap ([8b4a582](https://github.com/sguzman/oxbed/commit/8b4a58299422fc8e43712d30a455978509323975))## [0.1.2] - 2026-01-19
 
