@@ -6,19 +6,32 @@ pub fn normalize(
   let mut normalized =
     String::with_capacity(input.len());
   let mut last_was_space = false;
+  let mut newline_count = 0;
   for ch in input.nfkc() {
-    if ch == '\r' {
-      continue;
-    }
-    if ch.is_whitespace() {
-      if !last_was_space {
-        normalized.push(' ');
+    match ch {
+      | '\r' => continue,
+      | '\n' => {
+        if newline_count < 2 {
+          normalized.push('\n');
+        }
+        newline_count += 1;
         last_was_space = true;
       }
-      continue;
+      | c if c.is_whitespace() => {
+        if newline_count > 0 {
+          newline_count = 0;
+        }
+        if !last_was_space {
+          normalized.push(' ');
+          last_was_space = true;
+        }
+      }
+      | other => {
+        newline_count = 0;
+        normalized.push(other);
+        last_was_space = false;
+      }
     }
-    normalized.push(ch);
-    last_was_space = false;
   }
   normalized.trim().to_string()
 }
