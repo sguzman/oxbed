@@ -2,6 +2,9 @@
 ## [Unreleased]
 
 ### 🐛 Bug Fixes
+- More queries ([4e9191c](https://github.com/sguzman/oxbed/commit/4e9191cdab82977e0b2c25a30c922d050bc1dcaa))## [1.1.0] - 2026-01-20
+
+### 🐛 Bug Fixes
 - Workign evaluation now ([8340ae8](https://github.com/sguzman/oxbed/commit/8340ae8639544ffa5900929918cacfda3101afb4))
 
 ### 🚀 Features
