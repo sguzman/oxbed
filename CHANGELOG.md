@@ -2,6 +2,9 @@
 ## [Unreleased]
 
 ### 🚀 Features
+- Config tune ([e43acc3](https://github.com/sguzman/oxbed/commit/e43acc393187e39818b155c3c77b4c30ad1d2fe4))## [0.3.0] - 2026-01-20
+
+### 🚀 Features
 - Add example files ([18792f8](https://github.com/sguzman/oxbed/commit/18792f8272fbea9963399bda8c44d99fb2b15d8c))
 
 ### 🧪 Testing
