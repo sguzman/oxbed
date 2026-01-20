@@ -2,9 +2,11 @@ mod args;
 mod chunk;
 mod config;
 mod embedder;
+mod evaluation;
 mod index;
 mod normalization;
 mod pipeline;
+mod search;
 mod state;
 
 use anyhow::Result;

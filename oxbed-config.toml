@@ -44,12 +44,20 @@ rerank_enabled = false
 # Paths are relative to the repo root by default.
 state_file = "data/state.json"
 chunks_file = "data/chunks.jsonl"
+artifact_dir = "data"
 
 [stage2]
 # Placeholder for instrumentation controls (active once Stage 2 work is wired up).
 enabled = false
 log_evaluation = true
 run_baselines = true
+runs_dir = "runs"
+embedder_kinds = ["tf", "bag-of-words"]
+
+[stage2.evaluation]
+queries = [
+  { name = "Ishmael recall", query = "call me ishmael", expected_terms = ["ishmael", "call me"] }
+]
 
 [stage3]
 # RAG/LLM controls will live here (e.g., prompt budgets, citation toggles).

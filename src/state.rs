@@ -38,7 +38,7 @@ pub struct State {
 }
 
 #[derive(
-  Debug, Serialize, Deserialize,
+  Debug, Clone, Serialize, Deserialize,
 )]
 pub struct Document {
   pub id:          String,

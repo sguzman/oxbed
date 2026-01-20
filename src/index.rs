@@ -112,6 +112,7 @@ fn cosine_similarity(
 mod tests {
   use super::*;
   use crate::embedder::{
+    Embedder,
     SparseVector,
     TfEmbedder
   };

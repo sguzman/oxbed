@@ -50,5 +50,8 @@ pub enum Command {
   },
   /// Show corpus status (documents,
   /// chunks)
-  Status
+  Status,
+
+  /// Run the Stage 2 evaluation harness
+  Evaluate
 }

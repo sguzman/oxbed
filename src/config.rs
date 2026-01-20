@@ -146,6 +146,14 @@ impl Default for Stage1Chunk {
     }
   }
 }
+#[derive(
+  Clone, Copy, Debug, Deserialize,
+)]
+#[serde(rename_all = "lowercase")]
+pub enum EmbedderKind {
+  Tf,
+  BagOfWords
+}
 
 #[derive(Clone, Debug, Deserialize)]
 pub struct Stage1Embedder {
@@ -154,7 +162,11 @@ pub struct Stage1Embedder {
   )]
   pub tfidf_min_freq:  usize,
   #[serde(default = "default_true")]
-  pub normalize_query: bool
+  pub normalize_query: bool,
+  #[serde(
+    default = "default_embedder_kind"
+  )]
+  pub kind:            EmbedderKind
 }
 
 impl Default for Stage1Embedder {
@@ -162,7 +174,9 @@ impl Default for Stage1Embedder {
     Self {
       tfidf_min_freq:  default_min_freq(
       ),
-      normalize_query: true
+      normalize_query: true,
+      kind:
+        default_embedder_kind()
     }
   }
 }
@@ -223,7 +237,17 @@ pub struct Stage2Config {
   #[serde(default = "default_true")]
   pub log_evaluation: bool,
   #[serde(default = "default_true")]
-  pub run_baselines:  bool
+  pub run_baselines:  bool,
+  #[serde(
+    default = "default_stage2_runs_dir"
+  )]
+  pub runs_dir:       String,
+  #[serde(
+    default = "default_stage2_embedder_kinds"
+  )]
+  pub embedder_kinds: Vec<EmbedderKind>,
+  #[serde(default)]
+  pub evaluation:     Stage2Evaluation
 }
 
 impl Default for Stage2Config {
@@ -231,9 +255,39 @@ impl Default for Stage2Config {
     Self {
       enabled:        false,
       log_evaluation: true,
-      run_baselines:  true
+      run_baselines:  true,
+      runs_dir:
+        default_stage2_runs_dir(),
+      embedder_kinds:
+        default_stage2_embedder_kinds(),
+      evaluation:
+        Stage2Evaluation::default()
     }
   }
+}
+
+#[derive(Clone, Debug, Deserialize)]
+pub struct Stage2Evaluation {
+  #[serde(default)]
+  pub queries: Vec<EvaluationQuery>
+}
+
+impl Default for Stage2Evaluation {
+  fn default() -> Self {
+    Self {
+      queries: Vec::new()
+    }
+  }
+}
+
+#[derive(Clone, Debug, Deserialize)]
+pub struct EvaluationQuery {
+  pub name:           String,
+  pub query:          String,
+  #[serde(default)]
+  pub expected_terms: Vec<String>,
+  #[serde(default)]
+  pub top_k:          Option<usize>
 }
 
 #[derive(Clone, Debug, Deserialize)]
@@ -296,6 +350,11 @@ fn default_overlap() -> usize {
   32
 }
 
+fn default_embedder_kind()
+-> EmbedderKind {
+  EmbedderKind::Tf
+}
+
 fn default_chunk_separators()
 -> Vec<String> {
   vec![
@@ -324,6 +383,18 @@ fn default_chunks_file() -> String {
 
 fn default_artifact_dir() -> String {
   "data".into()
+}
+
+fn default_stage2_runs_dir() -> String {
+  "runs".into()
+}
+
+fn default_stage2_embedder_kinds()
+-> Vec<EmbedderKind> {
+  vec![
+    EmbedderKind::Tf,
+    EmbedderKind::BagOfWords,
+  ]
 }
 
 fn default_context_budget() -> usize {

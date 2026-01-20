@@ -26,12 +26,19 @@ use crate::chunk::{
   Chunker
 };
 use crate::config::Config;
-use crate::embedder::TfEmbedder;
+use crate::embedder::{
+  Embedder,
+  build_embedder
+};
 use crate::index::VectorIndex;
-use crate::normalization;
+use crate::search::search_hits;
 use crate::state::{
   Document,
   State
+};
+use crate::{
+  evaluation,
+  normalization
 };
 
 pub fn run(
@@ -47,6 +54,13 @@ pub fn run(
     VectorIndex::from_entries(
       state.index_entries.clone()
     );
+  let embedder = build_embedder(
+    config.stage1.embedder.kind,
+    config
+      .stage1
+      .embedder
+      .tfidf_min_freq
+  );
   match command {
     | Command::Ingest {
       path,
@@ -61,7 +75,8 @@ pub fn run(
         emit_normalized,
         &config,
         &mut state,
-        &mut index
+        &mut index,
+        embedder.as_ref()
       )?;
       state.index_entries =
         index.entries().to_vec();
@@ -95,7 +110,13 @@ pub fn run(
         resolved_top_k,
         &state,
         &index,
+        embedder.as_ref(),
         &config
+      )?;
+    }
+    | Command::Evaluate => {
+      evaluation::run_evaluation(
+        &config, &state, &index
       )?;
     }
     | Command::Status => {
@@ -112,7 +133,8 @@ fn ingest(
   emit_normalized: bool,
   config: &Config,
   state: &mut State,
-  index: &mut VectorIndex
+  index: &mut VectorIndex,
+  embedder: &dyn Embedder
 ) -> Result<()> {
   let source_files = collect_sources(
     path,
@@ -134,12 +156,6 @@ fn ingest(
     chunk_cfg.split_on_double_newline,
     chunk_cfg.dedupe_segments,
     chunk_cfg.chunk_separators.clone()
-  );
-  let embedder = TfEmbedder::new(
-    config
-      .stage1
-      .embedder
-      .tfidf_min_freq
   );
   let artifacts_dir = PathBuf::from(
     &config.stage1.storage.artifact_dir
@@ -241,10 +257,8 @@ fn ingest(
       id:          doc_id.clone(),
       path:        doc_path,
       hash:        hash.clone(),
-      token_count:
-        TfEmbedder::token_count(
-          &normalized
-        )
+      token_count: embedder
+        .token_count(&normalized)
     };
     let chunks = chunker
       .chunk(&doc_id, &normalized);
@@ -274,9 +288,8 @@ fn ingest(
       println!(
         "Document {} → {} tokens",
         file.display(),
-        TfEmbedder::token_count(
-          &normalized
-        )
+        embedder
+          .token_count(&normalized)
       );
     }
   }
@@ -413,6 +426,7 @@ fn search(
   top_k: usize,
   state: &State,
   index: &VectorIndex,
+  embedder: &dyn Embedder,
   config: &Config
 ) -> Result<()> {
   if state.index_entries.is_empty() {
@@ -422,85 +436,32 @@ fn search(
     );
     return Ok(());
   }
-  let embedder = TfEmbedder::new(
-    config
-      .stage1
-      .embedder
-      .tfidf_min_freq
-  );
-  let query_text = if config
-    .stage1
-    .embedder
-    .normalize_query
-  {
-    normalization::normalize(query)
-  } else {
-    query.to_string()
-  };
-  let query_vector =
-    embedder.embed(&query_text);
-  let matches =
-    index.search(&query_vector, top_k);
-  if matches.is_empty() {
+  let hits = search_hits(
+    embedder, query, top_k, config,
+    state, index
+  )?;
+  if hits.is_empty() {
     println!(
       "No matching chunks found for \
        query."
     );
     return Ok(());
   }
-  let filtered: Vec<_> = matches
-    .into_iter()
-    .filter(|(_, score)| {
-      *score
-        >= config
-          .stage1
-          .search
-          .score_threshold
-    })
-    .collect();
-  if filtered.is_empty() {
-    println!(
-      "No matching chunks found for \
-       query."
-    );
-    return Ok(());
-  }
-  for (rank, (idx, score)) in
-    filtered.into_iter().enumerate()
+  for (rank, hit) in
+    hits.into_iter().enumerate()
   {
-    let entry = index
-      .entries()
-      .get(idx)
-      .context(
-        "missing index entry for \
-         search result"
-      )?;
-    let chunk = state
-      .find_chunk(
-        entry.chunk_id.as_str()
-      )
-      .context(
-        "chunk metadata missing"
-      )?;
-    let document = state
-      .find_document(
-        entry.doc_id.as_str()
-      )
-      .context(
-        "document metadata missing"
-      )?;
     println!(
       "Result {} (score: {:.3})",
       rank + 1,
-      score
+      hit.score
     );
     println!(
       " → Document: {}",
-      document.path
+      hit.document.path
     );
     println!(
       " → Chunk: {}",
-      chunk.text.trim()
+      hit.chunk.text.trim()
     );
     println!("----------");
   }
@@ -537,10 +498,18 @@ mod tests {
   };
 
   use tempfile::TempDir;
+  use walkdir::WalkDir;
 
   use super::*;
   use crate::chunk::ChunkStrategy;
-  use crate::config::Config;
+  use crate::config::{
+    Config,
+    EmbedderKind,
+    EvaluationQuery
+  };
+  use crate::embedder::build_embedder;
+  use crate::evaluation;
+  use crate::index::VectorIndex;
   use crate::state::State;
 
   fn with_temp_data_dir(
@@ -652,10 +621,106 @@ mod tests {
           VectorIndex::from_entries(
             state.index_entries.clone()
           );
+        let embedder = build_embedder(
+          config.stage1.embedder.kind,
+          config
+            .stage1
+            .embedder
+            .tfidf_min_freq
+        );
         search(
-          "gamma", 3, &state, &index,
+          "gamma",
+          3,
+          &state,
+          &index,
+          embedder.as_ref(),
           &config
         )?;
+        Ok(())
+      }
+    )
+  }
+
+  #[test]
+  fn evaluation_logs_runs() -> Result<()>
+  {
+    with_temp_data_dir(
+      |path, mut config| {
+        config.stage2.enabled = true;
+        config.stage2.log_evaluation =
+          true;
+        config.stage2.runs_dir = path
+          .join("runs")
+          .to_string_lossy()
+          .into_owned();
+        config.stage2.embedder_kinds =
+          vec![EmbedderKind::Tf];
+        config
+          .stage2
+          .evaluation
+          .queries =
+          vec![EvaluationQuery {
+            name:           "doc"
+              .into(),
+            query:          "alpha"
+              .into(),
+            expected_terms: vec![
+              "alpha".into(),
+            ],
+            top_k:          Some(1)
+          }];
+        let corpus =
+          path.join("doc3.txt");
+        let mut file =
+          File::create(&corpus)?;
+        writeln!(file, "alpha beta")?;
+        run(
+          Command::Ingest {
+            path:            corpus
+              .clone(),
+            strategy:
+              ChunkStrategy::Fixed,
+            emit_word_tally: false,
+            emit_normalized: false
+          },
+          config.clone()
+        )?;
+        let state_path = PathBuf::from(
+          &config
+            .stage1
+            .storage
+            .state_file
+        );
+        let state = State::load_from(
+          &state_path
+        )?;
+        let index =
+          VectorIndex::from_entries(
+            state.index_entries.clone()
+          );
+        evaluation::run_evaluation(
+          &config, &state, &index
+        )?;
+        let mut found = false;
+        for entry in WalkDir::new(
+          &config.stage2.runs_dir
+        )
+        .into_iter()
+        .filter_map(Result::ok)
+        {
+          if entry
+            .path()
+            .extension()
+            .and_then(|ext| {
+              ext.to_str()
+            })
+            == Some("json")
+          {
+            found = true;
+            break;
+          }
+        }
+        assert!(found);
         Ok(())
       }
     )

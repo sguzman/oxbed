@@ -37,6 +37,7 @@ Release & contribution processes follow `docs/RELEASE.md` and `docs/ai/RUST.md`:
 
 - Implement the ingestion + chunking + query path described in Stage 1 so the CLI and vector store can deliver meaningful search results.
 - Once Stage 1 is stable (v1.0.0), iterate through the later stages documented in `ROADMAP.md`, using the evaluation harness, rerankers, and custom embedder workflows to advance the platform.
+- Enable Stage 2 instrumentation by running `oxbed evaluate` (once `stage2.enabled = true` in `oxbed-config.toml`) so you can capture recall@k/MRR/nDCG/latency metrics and write run summaries under `runs/YYYY-MM-DD/`.
 
 ## Branding
 
