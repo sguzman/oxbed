@@ -1,5 +1,8 @@
-use std::fs;
 use std::path::PathBuf;
+use std::{
+  env,
+  fs
+};
 
 use anyhow::Context;
 use serde::{
@@ -10,8 +13,15 @@ use serde::{
 use crate::chunk::Chunk;
 use crate::index::IndexEntry;
 
-const STATE_FILE: &str =
-  "data/state.json";
+pub fn data_dir() -> PathBuf {
+  if let Ok(override_dir) =
+    env::var("OXBED_DATA_DIR")
+  {
+    PathBuf::from(override_dir)
+  } else {
+    PathBuf::from("data")
+  }
+}
 
 #[derive(
   Debug, Serialize, Deserialize, Default,
@@ -87,7 +97,7 @@ impl State {
   }
 
   pub fn path() -> PathBuf {
-    PathBuf::from(STATE_FILE)
+    data_dir().join("state.json")
   }
 
   pub fn has_document(

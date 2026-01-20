@@ -46,3 +46,32 @@ fn tokenize(text: &str) -> Vec<String> {
     .map(|word| word.to_lowercase())
     .collect()
 }
+
+#[cfg(test)]
+mod tests {
+  use super::*;
+
+  #[test]
+  fn embedder_normalizes_counts() {
+    let embedder = TfEmbedder::new();
+    let vector =
+      embedder.embed("foo foo bar");
+    let foo = vector
+      .get("foo")
+      .copied()
+      .unwrap_or_default();
+    let bar = vector
+      .get("bar")
+      .copied()
+      .unwrap_or_default();
+    assert!(
+      (foo - (2.0 / 3.0)).abs() < 1e-6
+    );
+    assert!(
+      (bar - (1.0 / 3.0)).abs() < 1e-6
+    );
+    assert!(
+      !vector.contains_key("missing")
+    );
+  }
+}

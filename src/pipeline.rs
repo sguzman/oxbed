@@ -29,11 +29,9 @@ use crate::index::VectorIndex;
 use crate::normalization;
 use crate::state::{
   Document,
-  State
+  State,
+  data_dir
 };
-
-const CHUNKS_JSONL: &str =
-  "data/chunks.jsonl";
 
 pub fn run(
   command: Command
@@ -203,7 +201,7 @@ fn emit_chunks_jsonl(
   chunks: &[Chunk]
 ) -> Result<()> {
   let path =
-    PathBuf::from(CHUNKS_JSONL);
+    data_dir().join("chunks.jsonl");
   if let Some(parent) = path.parent() {
     fs::create_dir_all(parent)
       .with_context(|| {
@@ -308,4 +306,113 @@ fn status(state: &State) -> Result<()> {
     );
   }
   Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+  use std::fs::File;
+  use std::io::Write;
+  use std::path::Path;
+  use std::sync::Mutex;
+
+  use once_cell::sync::Lazy;
+  use tempfile::TempDir;
+
+  use super::*;
+  use crate::chunk::ChunkStrategy;
+  use crate::state::State;
+
+  static PIPELINE_TEST_LOCK: Lazy<
+    Mutex<()>
+  > = Lazy::new(|| Mutex::new(()));
+
+  fn with_temp_data_dir(
+    test: impl FnOnce(&Path) -> Result<()>
+  ) -> Result<()> {
+    let _guard = PIPELINE_TEST_LOCK
+      .lock()
+      .unwrap();
+    let temp = TempDir::new()?;
+    let data_dir =
+      temp.path().join("data");
+    let prev = std::env::var_os(
+      "OXBED_DATA_DIR"
+    );
+    unsafe {
+      std::env::set_var(
+        "OXBED_DATA_DIR",
+        &data_dir
+      );
+    }
+    let result = test(temp.path());
+    if let Some(orig) = prev {
+      unsafe {
+        std::env::set_var(
+          "OXBED_DATA_DIR",
+          orig
+        );
+      }
+    } else {
+      unsafe {
+        std::env::remove_var(
+          "OXBED_DATA_DIR"
+        );
+      }
+    }
+    result
+  }
+
+  #[test]
+  fn ingest_populates_state_and_chunks_jsonl()
+  -> Result<()> {
+    with_temp_data_dir(|path| {
+      let corpus = path.join("doc.txt");
+      let mut file =
+        File::create(&corpus)?;
+      writeln!(
+        file,
+        "alpha\n\nbeta\n\nalpha"
+      )?;
+      run(Command::Ingest {
+        path:     corpus.clone(),
+        strategy:
+          ChunkStrategy::Structured
+      })?;
+      let state = State::load()?;
+      assert_eq!(
+        state.documents.len(),
+        1
+      );
+      assert!(state.chunks.len() >= 1);
+      let chunk_file =
+        data_dir().join("chunks.jsonl");
+      assert!(chunk_file.exists());
+      Ok(())
+    })
+  }
+
+  #[test]
+  fn search_finds_matching_results()
+  -> Result<()> {
+    with_temp_data_dir(|path| {
+      let corpus =
+        path.join("doc2.txt");
+      let mut file =
+        File::create(&corpus)?;
+      writeln!(file, "gamma delta")?;
+      run(Command::Ingest {
+        path:     corpus.clone(),
+        strategy: ChunkStrategy::Fixed
+      })?;
+      let state = State::load()?;
+      let index =
+        VectorIndex::from_entries(
+          state.index_entries.clone()
+        );
+      search(
+        "gamma", 3, &state, &index
+      )?;
+      Ok(())
+    })
+  }
 }

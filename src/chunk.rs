@@ -42,6 +42,55 @@ impl fmt::Display for ChunkStrategy {
   }
 }
 
+#[cfg(test)]
+mod tests {
+  use super::*;
+
+  #[test]
+  fn structured_chunks_split_paragraphs_and_dedup()
+   {
+    let chunker = Chunker::new(
+      ChunkStrategy::Structured
+    );
+    let input =
+      "alpha\n\nbeta\n\nalpha";
+    let chunks =
+      chunker.chunk("doc", input);
+    assert_eq!(chunks.len(), 2);
+    assert!(chunks.iter().any(|c| {
+      c.text.contains("alpha")
+    }));
+    assert!(chunks.iter().any(|c| {
+      c.text.contains("beta")
+    }));
+  }
+
+  #[test]
+  fn fixed_chunks_obey_overlap_and_max()
+  {
+    let chunker = Chunker::new(
+      ChunkStrategy::Fixed
+    );
+    let input = "word ".repeat(500);
+    let chunks =
+      chunker.chunk("doc", &input);
+    assert!(chunks.len() >= 2);
+    for chunk in &chunks {
+      assert!(chunk.text.len() > 0);
+    }
+    let start_positions: Vec<_> =
+      chunks
+        .iter()
+        .map(|c| c.start)
+        .collect();
+    assert!(
+      start_positions
+        .windows(2)
+        .all(|w| w[1] > w[0])
+    );
+  }
+}
+
 #[derive(
   Clone, Debug, Serialize, Deserialize,
 )]

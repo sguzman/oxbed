@@ -107,3 +107,45 @@ fn cosine_similarity(
   }
   dot / (norm_a.sqrt() * norm_b.sqrt())
 }
+
+#[cfg(test)]
+mod tests {
+  use super::*;
+  use crate::embedder::{
+    SparseVector,
+    TfEmbedder
+  };
+
+  #[test]
+  fn search_returns_best_match_first() {
+    let mut index =
+      VectorIndex::from_entries(
+        Vec::new()
+      );
+    let mut vector =
+      SparseVector::new();
+    vector.insert("a".into(), 1.0);
+    index.add_chunk(
+      "c1".into(),
+      "doc".into(),
+      vector
+    );
+    let mut vector2 =
+      SparseVector::new();
+    vector2.insert("a".into(), 0.5);
+    vector2.insert("b".into(), 0.5);
+    index.add_chunk(
+      "c2".into(),
+      "doc".into(),
+      vector2
+    );
+    let query =
+      TfEmbedder::new().embed("a");
+    let results =
+      index.search(&query, 2);
+    assert_eq!(results.len(), 2);
+    assert!(
+      results[0].1 >= results[1].1
+    );
+  }
+}
