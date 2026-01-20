@@ -1,6 +1,12 @@
 # Changelog
 ## [Unreleased]
 
+### 🐛 Bug Fixes
+- Chunker ([900b738](https://github.com/sguzman/oxbed/commit/900b7383f791b859c090136ee1bc5e385592563a))
+
+### 🚀 Features
+- Add optional ingestion exports for normalized text and word tallies ([c6ffded](https://github.com/sguzman/oxbed/commit/c6ffded9219303cd0e40e0ae1a2246238e968f1c))## [0.5.0] - 2026-01-20
+
 ### ⚙️ Miscellaneous
 - Add toml ([4b8bcd9](https://github.com/sguzman/oxbed/commit/4b8bcd9c37d09766fa80817ba3a36ced037c0150))
 
