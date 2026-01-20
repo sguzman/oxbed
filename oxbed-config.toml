@@ -70,7 +70,7 @@ queries = [
 
 [stage3]
 # RAG/LLM controls will live here (e.g., prompt budgets, citation toggles).
-enabled = false
+enabled = true
 context_budget = 1024
 prompt_template = "Question: {query}\nContext:\n{context}\nAnswer:"
 
