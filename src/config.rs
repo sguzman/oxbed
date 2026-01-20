@@ -293,21 +293,103 @@ pub struct EvaluationQuery {
 #[derive(Clone, Debug, Deserialize)]
 pub struct Stage3Config {
   #[serde(default = "default_false")]
-  pub enabled:        bool,
+  pub enabled:         bool,
   #[serde(
     default = "default_context_budget"
   )]
-  pub context_budget: usize
+  pub context_budget:  usize,
+  #[serde(
+    default = "default_stage3_prompt_template"
+  )]
+  pub prompt_template: String,
+  #[serde(default)]
+  pub reranker: Stage3RerankerConfig
 }
 
 impl Default for Stage3Config {
   fn default() -> Self {
     Self {
-      enabled:        false,
+      enabled:         false,
       context_budget:
-        default_context_budget()
+        default_context_budget(),
+      prompt_template:
+        default_stage3_prompt_template(),
+      reranker:
+        Stage3RerankerConfig::default()
     }
   }
+}
+
+#[derive(Clone, Debug, Deserialize)]
+pub struct Stage3RerankerConfig {
+  #[serde(
+    default = "default_stage3_strategies"
+  )]
+  pub strategies:
+    Vec<Stage3RerankerStrategyConfig>
+}
+
+impl Default for Stage3RerankerConfig {
+  fn default() -> Self {
+    Self {
+      strategies:
+        default_stage3_strategies()
+    }
+  }
+}
+
+#[derive(Clone, Debug, Deserialize)]
+pub struct Stage3RerankerStrategyConfig
+{
+  pub name:          String,
+  #[serde(
+    default = "default_stage3_rerank_mode"
+  )]
+  pub mode:          Stage3RerankMode,
+  #[serde(default)]
+  pub boost_terms:   Vec<String>,
+  #[serde(
+    default = "default_stage3_boost_factor"
+  )]
+  pub boost_factor:  f32,
+  #[serde(
+    default = "default_stage3_threshold"
+  )]
+  pub threshold:     f32,
+  #[serde(
+    default = "default_stage3_hybrid_weight"
+  )]
+  pub hybrid_weight: f32
+}
+
+impl Default
+  for Stage3RerankerStrategyConfig
+{
+  fn default() -> Self {
+    Self {
+      name:          "embedding-only"
+        .into(),
+      mode:
+        default_stage3_rerank_mode(),
+      boost_terms:   Vec::new(),
+      boost_factor:
+        default_stage3_boost_factor(),
+      threshold:
+        default_stage3_threshold(),
+      hybrid_weight:
+        default_stage3_hybrid_weight()
+    }
+  }
+}
+
+#[derive(
+  Clone, Copy, Debug, Deserialize,
+)]
+#[serde(rename_all = "kebab-case")]
+pub enum Stage3RerankMode {
+  None,
+  TermOverlap,
+  Hybrid
 }
 
 #[derive(Clone, Debug, Deserialize)]
@@ -395,6 +477,37 @@ fn default_stage2_embedder_kinds()
     EmbedderKind::Tf,
     EmbedderKind::BagOfWords,
   ]
+}
+
+fn default_stage3_prompt_template()
+-> String {
+  "Question: {query}\nContext:\\
+   n{context}\nAnswer:"
+    .into()
+}
+
+fn default_stage3_strategies()
+-> Vec<Stage3RerankerStrategyConfig> {
+  vec![Stage3RerankerStrategyConfig::default()]
+}
+
+fn default_stage3_rerank_mode()
+-> Stage3RerankMode {
+  Stage3RerankMode::None
+}
+
+fn default_stage3_boost_factor() -> f32
+{
+  1.0
+}
+
+fn default_stage3_threshold() -> f32 {
+  0.0
+}
+
+fn default_stage3_hybrid_weight() -> f32
+{
+  0.5
 }
 
 fn default_context_budget() -> usize {

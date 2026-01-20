@@ -38,7 +38,8 @@ use crate::state::{
 };
 use crate::{
   evaluation,
-  normalization
+  normalization,
+  stage3
 };
 
 pub fn run(
@@ -112,6 +113,23 @@ pub fn run(
         &index,
         embedder.as_ref(),
         &config
+      )?;
+    }
+    | Command::Rag {
+      query,
+      top_k
+    } => {
+      let resolved_top_k = top_k
+        .unwrap_or(
+          config.stage1.search.top_k
+        );
+      stage3::run_stage3(
+        &query,
+        resolved_top_k,
+        &config,
+        &state,
+        &index,
+        embedder.as_ref()
       )?;
     }
     | Command::Evaluate => {

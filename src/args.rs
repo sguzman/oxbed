@@ -53,5 +53,15 @@ pub enum Command {
   Status,
 
   /// Run the Stage 2 evaluation harness
-  Evaluate
+  Evaluate,
+
+  /// Run the Stage 3 RAG workflow
+  Rag {
+    /// Query text
+    query: String,
+    /// Limit on retrieval hits
+    /// (default per stage1 search)
+    #[arg(long)]
+    top_k: Option<usize>
+  }
 }

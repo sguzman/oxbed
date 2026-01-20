@@ -72,6 +72,14 @@ queries = [
 # RAG/LLM controls will live here (e.g., prompt budgets, citation toggles).
 enabled = false
 context_budget = 1024
+prompt_template = "Question: {query}\nContext:\n{context}\nAnswer:"
+
+[stage3.reranker]
+strategies = [
+  { name = "embedding-only", mode = "none" },
+  { name = "term-overlap", mode = "term-overlap", boost_terms = ["whale", "ishmael"], boost_factor = 1.3 },
+  { name = "hybrid", mode = "hybrid", boost_terms = ["ahab", "captain"], boost_factor = 1.0, hybrid_weight = 0.6, threshold = 0.1 }
+]
 
 [stage4]
 # Custom-training toggles (training loops, checkpoints, manifests).
