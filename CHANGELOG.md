@@ -1,6 +1,10 @@
 # Changelog
 ## [Unreleased]
 
+### 🚀 Features
+- Add Stage 3 rag command and reranker configuration. ([aad7a26](https://github.com/sguzman/oxbed/commit/aad7a261e3e4c349455408231e930d0de81cf499))
+- Enabled stage 3 ([c82444d](https://github.com/sguzman/oxbed/commit/c82444d0e5c0c81490cb04522099a9999d989a8c))## [2.0.0] - 2026-01-20
+
 ### 🐛 Bug Fixes
 - More queries ([4e9191c](https://github.com/sguzman/oxbed/commit/4e9191cdab82977e0b2c25a30c922d050bc1dcaa))## [1.1.0] - 2026-01-20
 
