@@ -2,6 +2,12 @@
 ## [Unreleased]
 
 ### 🐛 Bug Fixes
+- Workign evaluation now ([8340ae8](https://github.com/sguzman/oxbed/commit/8340ae8639544ffa5900929918cacfda3101afb4))
+
+### 🚀 Features
+- Add Stage 2 evaluation harness and embedder plumbing ([23d68d4](https://github.com/sguzman/oxbed/commit/23d68d409cb31ce67e07c54f78c1b3faaa06f086))## [1.0.0] - 2026-01-20
+
+### 🐛 Bug Fixes
 - Emit path ([2c6f018](https://github.com/sguzman/oxbed/commit/2c6f018e0d5d4a4c7ec58e66ad856500ff24626c))## [0.5.1] - 2026-01-20
 
 ### 🐛 Bug Fixes
