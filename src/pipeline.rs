@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use std::fs::{
   self,
   File
@@ -49,11 +50,18 @@ pub fn run(
   match command {
     | Command::Ingest {
       path,
-      strategy
+      strategy,
+      emit_word_tally,
+      emit_normalized
     } => {
       ingest(
-        &path, strategy, &config,
-        &mut state, &mut index
+        &path,
+        strategy,
+        &config,
+        emit_word_tally.clone(),
+        emit_normalized.clone(),
+        &mut state,
+        &mut index
       )?;
       state.index_entries =
         index.entries().to_vec();
@@ -101,6 +109,8 @@ fn ingest(
   path: &Path,
   strategy: ChunkStrategy,
   config: &Config,
+  emit_word_tally: Option<PathBuf>,
+  emit_normalized: Option<PathBuf>,
   state: &mut State,
   index: &mut VectorIndex
 ) -> Result<()> {
@@ -131,6 +141,22 @@ fn ingest(
       .embedder
       .tfidf_min_freq
   );
+  let mut normalized_writer =
+    if let Some(path) =
+      emit_normalized.as_ref()
+    {
+      ensure_parent(path)?;
+      Some(File::create(path)?)
+    } else {
+      None
+    };
+  let word_tally_path = emit_word_tally;
+  let mut word_counts =
+    if word_tally_path.is_some() {
+      Some(HashMap::new())
+    } else {
+      None
+    };
   for file in source_files {
     let content =
       fs::read_to_string(&file)
@@ -144,6 +170,28 @@ fn ingest(
       normalization::normalize(
         &content
       );
+    if let Some(writer) =
+      normalized_writer.as_mut()
+    {
+      writeln!(
+        writer,
+        "### {}\n",
+        file.display()
+      )?;
+      writeln!(
+        writer,
+        "{}\n",
+        normalized
+      )?;
+    }
+    if let Some(counts) =
+      word_counts.as_mut()
+    {
+      accumulate_word_counts(
+        counts,
+        &normalized
+      );
+    }
     let hash = hash_text(&normalized);
     if state.has_document(&hash) {
       println!(
@@ -212,6 +260,14 @@ fn ingest(
       );
     }
   }
+  if let (Some(path), Some(counts)) =
+    (word_tally_path, word_counts)
+  {
+    ensure_parent(&path)?;
+    emit_word_tally_csv(
+      &path, &counts
+    )?;
+  }
   Ok(())
 }
 
@@ -248,6 +304,60 @@ fn collect_sources(
     }
   }
   Ok(files)
+}
+
+fn accumulate_word_counts(
+  counts: &mut HashMap<String, usize>,
+  text: &str
+) {
+  for token in text
+    .split(|c: char| {
+      !c.is_alphanumeric()
+    })
+    .filter(|part| !part.is_empty())
+  {
+    let word = token.to_lowercase();
+    *counts.entry(word).or_insert(0) +=
+      1;
+  }
+}
+
+fn emit_word_tally_csv(
+  path: &Path,
+  counts: &HashMap<String, usize>
+) -> Result<()> {
+  let mut entries: Vec<_> =
+    counts.iter().collect();
+  entries.sort_by(|a, b| {
+    b.1
+      .cmp(a.1)
+      .then_with(|| a.0.cmp(b.0))
+  });
+  let mut file = File::create(path)?;
+  writeln!(file, "word,count")?;
+  for (word, count) in entries {
+    writeln!(
+      file,
+      "{},{}",
+      word, count
+    )?;
+  }
+  Ok(())
+}
+
+fn ensure_parent(
+  path: &Path
+) -> Result<()> {
+  if let Some(parent) = path.parent() {
+    fs::create_dir_all(parent)
+      .with_context(|| {
+        format!(
+          "create directory {:?}",
+          parent
+        )
+      })?;
+  }
+  Ok(())
 }
 
 fn hash_text(text: &str) -> String {
@@ -452,9 +562,12 @@ mod tests {
         )?;
         run(
           Command::Ingest {
-            path:     corpus.clone(),
+            path:            corpus
+              .clone(),
             strategy:
-              ChunkStrategy::Structured
+              ChunkStrategy::Structured,
+            emit_word_tally: None,
+            emit_normalized: None
           },
           config.clone()
         )?;
@@ -498,9 +611,12 @@ mod tests {
         writeln!(file, "gamma delta")?;
         run(
           Command::Ingest {
-            path:     corpus.clone(),
+            path:            corpus
+              .clone(),
             strategy:
-              ChunkStrategy::Fixed
+              ChunkStrategy::Fixed,
+            emit_word_tally: None,
+            emit_normalized: None
           },
           config.clone()
         )?;

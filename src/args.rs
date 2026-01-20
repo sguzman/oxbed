@@ -25,11 +25,19 @@ pub enum Command {
   Ingest {
     /// Path to a file or directory to
     /// ingest
-    path:     PathBuf,
+    path:            PathBuf,
     /// Chunking strategy to apply
     /// (default: structured)
     #[arg(long, default_value_t = ChunkStrategy::Structured)]
-    strategy: ChunkStrategy
+    strategy:        ChunkStrategy,
+    /// Optional path to emit a CSV
+    /// tally of normalized word counts
+    #[arg(long)]
+    emit_word_tally: Option<PathBuf>,
+    /// Optional path to emit the fully
+    /// normalized text
+    #[arg(long)]
+    emit_normalized: Option<PathBuf>
   },
   /// Search the corpus with a query
   /// string
