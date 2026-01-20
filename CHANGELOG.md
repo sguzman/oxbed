@@ -1,6 +1,15 @@
 # Changelog
 ## [Unreleased]
 
+### ⚙️ Miscellaneous
+- Add toml ([4b8bcd9](https://github.com/sguzman/oxbed/commit/4b8bcd9c37d09766fa80817ba3a36ced037c0150))
+
+### 🐛 Bug Fixes
+- Warning ([75ace57](https://github.com/sguzman/oxbed/commit/75ace577f8529038bc54ef4ce883b92870e98d9a))
+
+### 🚀 Features
+- Configure chunk delim ([7bb9b6d](https://github.com/sguzman/oxbed/commit/7bb9b6de66b55987fb3c7c4af6d69a91a1292b9d))## [0.4.0] - 2026-01-20
+
 ### 🚀 Features
 - Config tune ([e43acc3](https://github.com/sguzman/oxbed/commit/e43acc393187e39818b155c3c77b4c30ad1d2fe4))## [0.3.0] - 2026-01-20
 
