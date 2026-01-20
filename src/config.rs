@@ -149,7 +149,7 @@ impl Default for Stage1Chunk {
 #[derive(
   Clone, Copy, Debug, Deserialize,
 )]
-#[serde(rename_all = "lowercase")]
+#[serde(rename_all = "kebab-case")]
 pub enum EmbedderKind {
   Tf,
   BagOfWords

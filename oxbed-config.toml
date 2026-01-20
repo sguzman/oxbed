@@ -48,7 +48,7 @@ artifact_dir = "data"
 
 [stage2]
 # Placeholder for instrumentation controls (active once Stage 2 work is wired up).
-enabled = false
+enabled = true
 log_evaluation = true
 run_baselines = true
 runs_dir = "runs"
@@ -56,7 +56,9 @@ embedder_kinds = ["tf", "bag-of-words"]
 
 [stage2.evaluation]
 queries = [
-  { name = "Ishmael recall", query = "call me ishmael", expected_terms = ["ishmael", "call me"] }
+  { name = "Ishmael recall", query = "call me ishmael", expected_terms = ["ishmael", "call me"] },
+  { name = "Whale description", query = "white whale", expected_terms = ["whale", "white"] },
+  { name = "Nantucket mention", query = "nantucket harbor", expected_terms = ["nantucket", "harbor"] }
 ]
 
 [stage3]
