@@ -5,12 +5,15 @@ use unicode_segmentation::UnicodeSegmentation;
 pub type SparseVector =
   HashMap<String, f32>;
 
-#[derive(Default)]
-pub struct TfEmbedder;
+pub struct TfEmbedder {
+  min_freq: usize
+}
 
 impl TfEmbedder {
-  pub fn new() -> Self {
-    Self
+  pub fn new(min_freq: usize) -> Self {
+    Self {
+      min_freq: min_freq.max(1)
+    }
   }
 
   pub fn embed(
@@ -18,19 +21,37 @@ impl TfEmbedder {
     text: &str
   ) -> SparseVector {
     let tokens = tokenize(text);
-    let total =
-      tokens.len().max(1) as f32;
-    let mut counts =
-      SparseVector::new();
+    let mut counts: std::collections::HashMap<
+      String,
+      usize
+    > = std::collections::HashMap::new();
     for token in tokens {
       *counts
         .entry(token)
-        .or_insert(0.0) += 1.0;
+        .or_insert(0) += 1;
     }
-    for value in counts.values_mut() {
-      *value /= total;
+    let entries: Vec<_> = counts
+      .into_iter()
+      .filter(|(_, count)| {
+        *count >= self.min_freq
+      })
+      .collect();
+    let total: f32 = entries
+      .iter()
+      .map(|(_, count)| *count as f32)
+      .sum();
+    if total == 0.0 {
+      return SparseVector::new();
     }
-    counts
+    let mut vector =
+      SparseVector::new();
+    for (token, count) in entries {
+      vector.insert(
+        token,
+        count as f32 / total
+      );
+    }
+    vector
   }
 
   pub fn token_count(
@@ -53,7 +74,7 @@ mod tests {
 
   #[test]
   fn embedder_normalizes_counts() {
-    let embedder = TfEmbedder::new();
+    let embedder = TfEmbedder::new(1);
     let vector =
       embedder.embed("foo foo bar");
     let foo = vector

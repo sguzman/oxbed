@@ -1,0 +1,60 @@
+# Oxbed runtime tuning knobs
+# This file captures stage-level knobs (Stage 1 was ingestion → chunking → indexing) and feature toggles that let you adjust each operation without editing Rust source.
+
+[stage1]
+# Control how the core pipeline behaves when ingesting `.txt`/`.md` corpora.
+# `enabled` gates Stage 1 automation (set to false to opt-out while keeping other stages intact).
+enabled = true
+
+[stage1.ingest]
+# File extensions that feed the corpus ingest loop (stage 1 only handles `.txt`/`.md` today).
+extensions = ["txt", "md"]
+# Skip files whose hash already exists in the corpus state to avoid reprocessing.
+skip_duplicates = true
+# If enabled, the runner prints a summary per document when ingest finishes.
+verbose_documents = true
+
+[stage1.chunk]
+# Max tokens per chunk before forcing a split.
+max_tokens = 200
+# Amount of token overlap between consecutive chunks.
+overlap = 32
+# Force a blank-line break when using the structured chunker.
+split_on_double_newline = true
+# Whether to dedupe identical segments before emitting chunks.
+dedupe_segments = true
+
+[stage1.embedder]
+# The current TF baseline uses lowercase tokens; adjust min frequency to ignore rare tokens (1 = keep all tokens).
+tfidf_min_freq = 1
+# Normalize query CSI by default within the pipelines (true = lowercasing/tokenization).
+normalize_query = true
+
+[stage1.search]
+# Default `top_k` used when a CLI argument is not provided.
+top_k = 5
+# A floor on candidate scores; set to 0 to show every match.
+score_threshold = 0.0
+# Turn reranking on when future rerankers are wired in.
+rerank_enabled = false
+
+[stage1.storage]
+# Paths are relative to the repo root by default.
+state_file = "data/state.json"
+chunks_file = "data/chunks.jsonl"
+
+[stage2]
+# Placeholder for instrumentation controls (active once Stage 2 work is wired up).
+enabled = false
+log_evaluation = true
+run_baselines = true
+
+[stage3]
+# RAG/LLM controls will live here (e.g., prompt budgets, citation toggles).
+enabled = false
+context_budget = 1024
+
+[stage4]
+# Custom-training toggles (training loops, checkpoints, manifests).
+enabled = false
+checkpoint_dir = "models/"

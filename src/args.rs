@@ -37,8 +37,8 @@ pub enum Command {
     /// Query text
     query: String,
     /// Number of results to return
-    #[arg(long, default_value_t = 5)]
-    top_k: usize
+    #[arg(long)]
+    top_k: Option<usize>
   },
   /// Show corpus status (documents,
   /// chunks)

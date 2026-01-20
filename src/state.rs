@@ -1,4 +1,9 @@
-use std::path::PathBuf;
+#![allow(dead_code)]
+
+use std::path::{
+  Path,
+  PathBuf
+};
 use std::{
   env,
   fs
@@ -45,7 +50,13 @@ pub struct Document {
 impl State {
   pub fn load() -> anyhow::Result<Self>
   {
-    let path = Self::path();
+    Self::load_from(Self::path())
+  }
+
+  pub fn load_from(
+    path: impl AsRef<Path>
+  ) -> anyhow::Result<Self> {
+    let path = path.as_ref();
     if path.exists() {
       let contents =
         fs::read_to_string(&path)
@@ -67,7 +78,14 @@ impl State {
   pub fn save(
     &self
   ) -> anyhow::Result<()> {
-    let path = Self::path();
+    self.save_to(Self::path())
+  }
+
+  pub fn save_to(
+    &self,
+    path: impl AsRef<Path>
+  ) -> anyhow::Result<()> {
+    let path = path.as_ref();
     if let Some(parent) = path.parent()
     {
       fs::create_dir_all(parent)
@@ -86,7 +104,7 @@ impl State {
       .context(
         "serialize Oxbed corpus state"
       )?;
-    fs::write(&path, serialized)
+    fs::write(path, serialized)
       .with_context(|| {
         format!(
           "write state to {:?}",

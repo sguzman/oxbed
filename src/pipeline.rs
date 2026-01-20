@@ -24,19 +24,24 @@ use crate::chunk::{
   ChunkStrategy,
   Chunker
 };
+use crate::config::Config;
 use crate::embedder::TfEmbedder;
 use crate::index::VectorIndex;
 use crate::normalization;
 use crate::state::{
   Document,
-  State,
-  data_dir
+  State
 };
 
 pub fn run(
-  command: Command
+  command: Command,
+  config: Config
 ) -> Result<()> {
-  let mut state = State::load()?;
+  let state_path = PathBuf::from(
+    &config.stage1.storage.state_file
+  );
+  let mut state =
+    State::load_from(&state_path)?;
   let mut index =
     VectorIndex::from_entries(
       state.index_entries.clone()
@@ -47,13 +52,21 @@ pub fn run(
       strategy
     } => {
       ingest(
-        &path, strategy, &mut state,
-        &mut index
+        &path, strategy, &config,
+        &mut state, &mut index
       )?;
       state.index_entries =
         index.entries().to_vec();
-      emit_chunks_jsonl(&state.chunks)?;
-      state.save()?;
+      emit_chunks_jsonl(
+        &state.chunks,
+        &PathBuf::from(
+          &config
+            .stage1
+            .storage
+            .chunks_file
+        )
+      )?;
+      state.save_to(&state_path)?;
       println!(
         "Ingested {} documents ({} \
          chunks total).",
@@ -65,8 +78,16 @@ pub fn run(
       query,
       top_k
     } => {
+      let resolved_top_k = top_k
+        .unwrap_or(
+          config.stage1.search.top_k
+        );
       search(
-        &query, top_k, &state, &index
+        &query,
+        resolved_top_k,
+        &state,
+        &index,
+        &config
       )?;
     }
     | Command::Status => {
@@ -79,11 +100,14 @@ pub fn run(
 fn ingest(
   path: &Path,
   strategy: ChunkStrategy,
+  config: &Config,
   state: &mut State,
   index: &mut VectorIndex
 ) -> Result<()> {
-  let source_files =
-    collect_sources(path)?;
+  let source_files = collect_sources(
+    path,
+    &config.stage1.ingest.extensions
+  )?;
   if source_files.is_empty() {
     println!(
       "No text or Markdown files \
@@ -92,8 +116,20 @@ fn ingest(
     );
     return Ok(());
   }
-  let chunker = Chunker::new(strategy);
-  let embedder = TfEmbedder::new();
+  let chunk_cfg = &config.stage1.chunk;
+  let chunker = Chunker::with_config(
+    strategy,
+    chunk_cfg.max_tokens,
+    chunk_cfg.overlap,
+    chunk_cfg.split_on_double_newline,
+    chunk_cfg.dedupe_segments
+  );
+  let embedder = TfEmbedder::new(
+    config
+      .stage1
+      .embedder
+      .tfidf_min_freq
+  );
   for file in source_files {
     let content =
       fs::read_to_string(&file)
@@ -114,7 +150,13 @@ fn ingest(
          {:?}",
         file
       );
-      continue;
+      if config
+        .stage1
+        .ingest
+        .skip_duplicates
+      {
+        continue;
+      }
     }
     let doc_id =
       uuid::Uuid::new_v4().to_string();
@@ -155,12 +197,26 @@ fn ingest(
       state.chunks.push(chunk);
     }
     state.documents.push(document);
+    if config
+      .stage1
+      .ingest
+      .verbose_documents
+    {
+      println!(
+        "Document {} → {} tokens",
+        file.display(),
+        TfEmbedder::token_count(
+          &normalized
+        )
+      );
+    }
   }
   Ok(())
 }
 
 fn collect_sources(
-  path: &Path
+  path: &Path,
+  allowed_exts: &[String]
 ) -> Result<Vec<PathBuf>> {
   let mut files = Vec::new();
   if path.is_file() {
@@ -176,12 +232,14 @@ fn collect_sources(
       if let Some(ext) =
         entry.path().extension()
       {
-        if matches!(
-          ext
-            .to_string_lossy()
-            .to_lowercase()
-            .as_str(),
-          "txt" | "md"
+        let candidate = ext
+          .to_string_lossy()
+          .to_lowercase();
+        if allowed_exts.iter().any(
+          |allowed| {
+            allowed.to_lowercase()
+              == candidate
+          }
         ) {
           files.push(entry.into_path());
         }
@@ -198,10 +256,9 @@ fn hash_text(text: &str) -> String {
 }
 
 fn emit_chunks_jsonl(
-  chunks: &[Chunk]
+  chunks: &[Chunk],
+  path: &Path
 ) -> Result<()> {
-  let path =
-    data_dir().join("chunks.jsonl");
   if let Some(parent) = path.parent() {
     fs::create_dir_all(parent)
       .with_context(|| {
@@ -225,7 +282,8 @@ fn search(
   query: &str,
   top_k: usize,
   state: &State,
-  index: &VectorIndex
+  index: &VectorIndex,
+  config: &Config
 ) -> Result<()> {
   if state.index_entries.is_empty() {
     println!(
@@ -234,9 +292,23 @@ fn search(
     );
     return Ok(());
   }
-  let embedder = TfEmbedder::new();
+  let embedder = TfEmbedder::new(
+    config
+      .stage1
+      .embedder
+      .tfidf_min_freq
+  );
+  let query_text = if config
+    .stage1
+    .embedder
+    .normalize_query
+  {
+    normalization::normalize(query)
+  } else {
+    query.to_string()
+  };
   let query_vector =
-    embedder.embed(query);
+    embedder.embed(&query_text);
   let matches =
     index.search(&query_vector, top_k);
   if matches.is_empty() {
@@ -246,8 +318,25 @@ fn search(
     );
     return Ok(());
   }
+  let filtered: Vec<_> = matches
+    .into_iter()
+    .filter(|(_, score)| {
+      *score
+        >= config
+          .stage1
+          .search
+          .score_threshold
+    })
+    .collect();
+  if filtered.is_empty() {
+    println!(
+      "No matching chunks found for \
+       query."
+    );
+    return Ok(());
+  }
   for (rank, (idx, score)) in
-    matches.into_iter().enumerate()
+    filtered.into_iter().enumerate()
   {
     let entry = index
       .entries()
@@ -312,107 +401,127 @@ fn status(state: &State) -> Result<()> {
 mod tests {
   use std::fs::File;
   use std::io::Write;
-  use std::path::Path;
-  use std::sync::Mutex;
+  use std::path::{
+    Path,
+    PathBuf
+  };
 
-  use once_cell::sync::Lazy;
   use tempfile::TempDir;
 
   use super::*;
   use crate::chunk::ChunkStrategy;
+  use crate::config::Config;
   use crate::state::State;
 
-  static PIPELINE_TEST_LOCK: Lazy<
-    Mutex<()>
-  > = Lazy::new(|| Mutex::new(()));
-
   fn with_temp_data_dir(
-    test: impl FnOnce(&Path) -> Result<()>
+    test: impl FnOnce(
+      &Path,
+      Config
+    ) -> Result<()>
   ) -> Result<()> {
-    let _guard = PIPELINE_TEST_LOCK
-      .lock()
-      .unwrap();
     let temp = TempDir::new()?;
-    let data_dir =
-      temp.path().join("data");
-    let prev = std::env::var_os(
-      "OXBED_DATA_DIR"
-    );
-    unsafe {
-      std::env::set_var(
-        "OXBED_DATA_DIR",
-        &data_dir
-      );
-    }
-    let result = test(temp.path());
-    if let Some(orig) = prev {
-      unsafe {
-        std::env::set_var(
-          "OXBED_DATA_DIR",
-          orig
-        );
-      }
-    } else {
-      unsafe {
-        std::env::remove_var(
-          "OXBED_DATA_DIR"
-        );
-      }
-    }
-    result
+    let mut config = Config::default();
+    config.stage1.storage.state_file =
+      temp
+        .path()
+        .join("state.json")
+        .to_string_lossy()
+        .into_owned();
+    config.stage1.storage.chunks_file =
+      temp
+        .path()
+        .join("chunks.jsonl")
+        .to_string_lossy()
+        .into_owned();
+    test(temp.path(), config)
   }
 
   #[test]
   fn ingest_populates_state_and_chunks_jsonl()
   -> Result<()> {
-    with_temp_data_dir(|path| {
-      let corpus = path.join("doc.txt");
-      let mut file =
-        File::create(&corpus)?;
-      writeln!(
-        file,
-        "alpha\n\nbeta\n\nalpha"
-      )?;
-      run(Command::Ingest {
-        path:     corpus.clone(),
-        strategy:
-          ChunkStrategy::Structured
-      })?;
-      let state = State::load()?;
-      assert_eq!(
-        state.documents.len(),
-        1
-      );
-      assert!(state.chunks.len() >= 1);
-      let chunk_file =
-        data_dir().join("chunks.jsonl");
-      assert!(chunk_file.exists());
-      Ok(())
-    })
+    with_temp_data_dir(
+      |path, config| {
+        let corpus =
+          path.join("doc.txt");
+        let mut file =
+          File::create(&corpus)?;
+        writeln!(
+          file,
+          "alpha\n\nbeta\n\nalpha"
+        )?;
+        run(
+          Command::Ingest {
+            path:     corpus.clone(),
+            strategy:
+              ChunkStrategy::Structured
+          },
+          config.clone()
+        )?;
+        let state_path = PathBuf::from(
+          &config
+            .stage1
+            .storage
+            .state_file
+        );
+        let state = State::load_from(
+          &state_path
+        )?;
+        assert_eq!(
+          state.documents.len(),
+          1
+        );
+        assert!(
+          state.chunks.len() >= 1
+        );
+        let chunk_file = PathBuf::from(
+          &config
+            .stage1
+            .storage
+            .chunks_file
+        );
+        assert!(chunk_file.exists());
+        Ok(())
+      }
+    )
   }
 
   #[test]
   fn search_finds_matching_results()
   -> Result<()> {
-    with_temp_data_dir(|path| {
-      let corpus =
-        path.join("doc2.txt");
-      let mut file =
-        File::create(&corpus)?;
-      writeln!(file, "gamma delta")?;
-      run(Command::Ingest {
-        path:     corpus.clone(),
-        strategy: ChunkStrategy::Fixed
-      })?;
-      let state = State::load()?;
-      let index =
-        VectorIndex::from_entries(
-          state.index_entries.clone()
+    with_temp_data_dir(
+      |path, config| {
+        let corpus =
+          path.join("doc2.txt");
+        let mut file =
+          File::create(&corpus)?;
+        writeln!(file, "gamma delta")?;
+        run(
+          Command::Ingest {
+            path:     corpus.clone(),
+            strategy:
+              ChunkStrategy::Fixed
+          },
+          config.clone()
+        )?;
+        let state_path = PathBuf::from(
+          &config
+            .stage1
+            .storage
+            .state_file
         );
-      search(
-        "gamma", 3, &state, &index
-      )?;
-      Ok(())
-    })
+        let state = State::load_from(
+          &state_path
+        )?;
+        let index =
+          VectorIndex::from_entries(
+            state.index_entries.clone()
+          );
+        search(
+          "gamma", 3, &state, &index,
+          &config
+        )?;
+        Ok(())
+      }
+    )
   }
 }

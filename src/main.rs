@@ -1,5 +1,6 @@
 mod args;
 mod chunk;
+mod config;
 mod embedder;
 mod index;
 mod normalization;
@@ -10,8 +11,12 @@ use anyhow::Result;
 use clap::Parser;
 
 use crate::args::Cli;
+use crate::config::Config;
 
 fn main() -> Result<()> {
+  let config =
+    Config::load("oxbed-config.toml")
+      .unwrap_or_default();
   let cli = Cli::parse();
-  pipeline::run(cli.command)
+  pipeline::run(cli.command, config)
 }

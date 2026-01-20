@@ -140,7 +140,7 @@ mod tests {
       vector2
     );
     let query =
-      TfEmbedder::new().embed("a");
+      TfEmbedder::new(1).embed("a");
     let results =
       index.search(&query, 2);
     assert_eq!(results.len(), 2);

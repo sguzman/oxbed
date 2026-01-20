@@ -104,19 +104,35 @@ pub struct Chunk {
 }
 
 pub struct Chunker {
-  strategy:   ChunkStrategy,
-  max_tokens: usize,
-  overlap:    usize
+  strategy: ChunkStrategy,
+  max_tokens:              usize,
+  overlap:                 usize,
+  split_on_double_newline: bool,
+  dedupe_segments:         bool
 }
 
 impl Chunker {
   pub fn new(
     strategy: ChunkStrategy
   ) -> Self {
+    Self::with_config(
+      strategy, 200, 32, true, true
+    )
+  }
+
+  pub fn with_config(
+    strategy: ChunkStrategy,
+    max_tokens: usize,
+    overlap: usize,
+    split_on_double_newline: bool,
+    dedupe_segments: bool
+  ) -> Self {
     Self {
       strategy,
-      max_tokens: 200,
-      overlap: 32
+      max_tokens,
+      overlap,
+      split_on_double_newline,
+      dedupe_segments
     }
   }
 
@@ -142,12 +158,23 @@ impl Chunker {
   ) -> Vec<Chunk> {
     let mut cursor = 0;
     let mut results = Vec::new();
-    let mut seen = HashSet::new();
+    let mut seen =
+      if self.dedupe_segments {
+        Some(HashSet::new())
+      } else {
+        None
+      };
     while cursor < input.len() {
       let remaining = &input[cursor..];
-      let split_len = remaining
-        .find("\n\n")
-        .unwrap_or(remaining.len());
+      let split_len = if self
+        .split_on_double_newline
+      {
+        remaining
+          .find("\n\n")
+          .unwrap_or(remaining.len())
+      } else {
+        remaining.len()
+      };
       let segment = &input
         [cursor..cursor + split_len];
       if let Some(chunk) = self.segment(
@@ -155,7 +182,7 @@ impl Chunker {
         doc_id,
         segment,
         ChunkStrategy::Structured,
-        &mut seen
+        seen.as_mut()
       ) {
         results.push(chunk);
       }
@@ -179,7 +206,12 @@ impl Chunker {
       return Vec::new();
     }
     let mut results = Vec::new();
-    let mut seen = HashSet::new();
+    let mut seen =
+      if self.dedupe_segments {
+        Some(HashSet::new())
+      } else {
+        None
+      };
     let step = (self
       .max_tokens
       .saturating_sub(self.overlap))
@@ -199,7 +231,7 @@ impl Chunker {
         doc_id,
         candidate,
         ChunkStrategy::Fixed,
-        &mut seen
+        seen.as_mut()
       ) {
         results.push(chunk);
       }
@@ -217,14 +249,18 @@ impl Chunker {
     doc_id: &str,
     segment: &str,
     strategy: ChunkStrategy,
-    seen: &mut HashSet<String>
+    seen: Option<&mut HashSet<String>>
   ) -> Option<Chunk> {
     let trimmed = segment.trim();
-    if trimmed.is_empty()
-      || !seen
-        .insert(trimmed.to_string())
-    {
+    if trimmed.is_empty() {
       return None;
+    }
+    if let Some(seen) = seen {
+      if !seen
+        .insert(trimmed.to_string())
+      {
+        return None;
+      }
     }
     let trimmed_start = segment.len()
       - segment.trim_start().len();
