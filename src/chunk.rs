@@ -54,7 +54,8 @@ mod tests {
       200,
       32,
       true,
-      true
+      true,
+      vec!["\n\n".into()]
     );
     let input =
       "alpha\n\nbeta\n\nalpha";
@@ -77,7 +78,8 @@ mod tests {
       200,
       32,
       true,
-      true
+      true,
+      vec!["\n\n".into()]
     );
     let input = "word ".repeat(500);
     let chunks =
@@ -116,7 +118,8 @@ pub struct Chunker {
   max_tokens:              usize,
   overlap:                 usize,
   split_on_double_newline: bool,
-  dedupe_segments:         bool
+  dedupe_segments:         bool,
+  chunk_separators:        Vec<String>
 }
 
 impl Chunker {
@@ -125,14 +128,16 @@ impl Chunker {
     max_tokens: usize,
     overlap: usize,
     split_on_double_newline: bool,
-    dedupe_segments: bool
+    dedupe_segments: bool,
+    chunk_separators: Vec<String>
   ) -> Self {
     Self {
       strategy,
       max_tokens,
       overlap,
       split_on_double_newline,
-      dedupe_segments
+      dedupe_segments,
+      chunk_separators
     }
   }
 
@@ -166,14 +171,15 @@ impl Chunker {
       };
     while cursor < input.len() {
       let remaining = &input[cursor..];
-      let split_len = if self
+      let (split_len, sep_len) = if self
         .split_on_double_newline
       {
-        remaining
-          .find("\n\n")
-          .unwrap_or(remaining.len())
+        find_split_length(
+          remaining,
+          &self.chunk_separators
+        )
       } else {
-        remaining.len()
+        (remaining.len(), 0)
       };
       let segment = &input
         [cursor..cursor + split_len];
@@ -190,6 +196,7 @@ impl Chunker {
         break;
       }
       cursor += split_len;
+      cursor += sep_len;
       cursor +=
         skip_newlines(&input[cursor..]);
     }
@@ -293,6 +300,30 @@ fn skip_newlines(
     })
     .map(|c| c.len_utf8())
     .sum()
+}
+
+fn find_split_length(
+  remaining: &str,
+  separators: &[String]
+) -> (usize, usize) {
+  let mut best = None;
+  for sep in separators {
+    if sep.is_empty() {
+      continue;
+    }
+    if let Some(idx) =
+      remaining.find(sep)
+    {
+      match best {
+        | Some((best_idx, _))
+          if best_idx <= idx => {}
+        | _ => {
+          best = Some((idx, sep.len()))
+        }
+      }
+    }
+  }
+  best.unwrap_or((remaining.len(), 0))
 }
 
 struct TokenBoundary {

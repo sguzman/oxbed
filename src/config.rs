@@ -125,7 +125,11 @@ pub struct Stage1Chunk {
   #[serde(default = "default_true")]
   pub split_on_double_newline: bool,
   #[serde(default = "default_true")]
-  pub dedupe_segments:         bool
+  pub dedupe_segments:         bool,
+  #[serde(
+    default = "default_chunk_separators"
+  )]
+  pub chunk_separators: Vec<String>
 }
 
 impl Default for Stage1Chunk {
@@ -136,7 +140,9 @@ impl Default for Stage1Chunk {
       overlap:
         default_overlap(),
       split_on_double_newline: true,
-      dedupe_segments:         true
+      dedupe_segments:         true,
+      chunk_separators:
+        default_chunk_separators()
     }
   }
 }
@@ -281,6 +287,16 @@ fn default_max_tokens() -> usize {
 
 fn default_overlap() -> usize {
   32
+}
+
+fn default_chunk_separators()
+-> Vec<String> {
+  vec![
+    "\n\n".into(),
+    "\r\n\r\n".into(),
+    "\n-\n".into(),
+    "\n*\n".into(),
+  ]
 }
 
 fn default_min_freq() -> usize {

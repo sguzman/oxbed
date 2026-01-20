@@ -23,6 +23,8 @@ overlap = 32
 split_on_double_newline = true
 # Whether to dedupe identical segments before emitting chunks.
 dedupe_segments = true
+# Custom separator sequences that trigger a new chunk (tries each in order).
+chunk_separators = ["\n\n", "\r\n\r\n", "\n-\n", "\n*\n"]
 
 [stage1.embedder]
 # The current TF baseline uses lowercase tokens; adjust min frequency to ignore rare tokens (1 = keep all tokens).

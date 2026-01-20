@@ -122,7 +122,8 @@ fn ingest(
     chunk_cfg.max_tokens,
     chunk_cfg.overlap,
     chunk_cfg.split_on_double_newline,
-    chunk_cfg.dedupe_segments
+    chunk_cfg.dedupe_segments,
+    chunk_cfg.chunk_separators.clone()
   );
   let embedder = TfEmbedder::new(
     config
