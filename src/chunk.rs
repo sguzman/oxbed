@@ -1,0 +1,243 @@
+use std::collections::HashSet;
+use std::fmt;
+
+use clap::ValueEnum;
+use serde::{
+  Deserialize,
+  Serialize
+};
+use uuid::Uuid;
+
+use crate::normalization;
+
+#[derive(
+  Debug,
+  Clone,
+  Copy,
+  Serialize,
+  Deserialize,
+  ValueEnum,
+  PartialEq,
+  Eq,
+)]
+#[serde(rename_all = "lowercase")]
+pub enum ChunkStrategy {
+  Structured,
+  Fixed
+}
+
+impl fmt::Display for ChunkStrategy {
+  fn fmt(
+    &self,
+    f: &mut fmt::Formatter<'_>
+  ) -> fmt::Result {
+    match self {
+      | ChunkStrategy::Structured => {
+        f.write_str("structured")
+      }
+      | ChunkStrategy::Fixed => {
+        f.write_str("fixed")
+      }
+    }
+  }
+}
+
+#[derive(
+  Clone, Debug, Serialize, Deserialize,
+)]
+pub struct Chunk {
+  pub id:       String,
+  pub doc_id:   String,
+  pub text:     String,
+  pub start:    usize,
+  pub end:      usize,
+  pub strategy: ChunkStrategy
+}
+
+pub struct Chunker {
+  strategy:   ChunkStrategy,
+  max_tokens: usize,
+  overlap:    usize
+}
+
+impl Chunker {
+  pub fn new(
+    strategy: ChunkStrategy
+  ) -> Self {
+    Self {
+      strategy,
+      max_tokens: 200,
+      overlap: 32
+    }
+  }
+
+  pub fn chunk(
+    &self,
+    doc_id: &str,
+    input: &str
+  ) -> Vec<Chunk> {
+    match self.strategy {
+      | ChunkStrategy::Structured => {
+        self.structured(doc_id, input)
+      }
+      | ChunkStrategy::Fixed => {
+        self.fixed(doc_id, input)
+      }
+    }
+  }
+
+  fn structured(
+    &self,
+    doc_id: &str,
+    input: &str
+  ) -> Vec<Chunk> {
+    let mut cursor = 0;
+    let mut results = Vec::new();
+    let mut seen = HashSet::new();
+    while cursor < input.len() {
+      let remaining = &input[cursor..];
+      let split_len = remaining
+        .find("\n\n")
+        .unwrap_or(remaining.len());
+      let segment = &input
+        [cursor..cursor + split_len];
+      if let Some(chunk) = self.segment(
+        cursor,
+        doc_id,
+        segment,
+        ChunkStrategy::Structured,
+        &mut seen
+      ) {
+        results.push(chunk);
+      }
+      if split_len == remaining.len() {
+        break;
+      }
+      cursor += split_len;
+      cursor +=
+        skip_newlines(&input[cursor..]);
+    }
+    results
+  }
+
+  fn fixed(
+    &self,
+    doc_id: &str,
+    input: &str
+  ) -> Vec<Chunk> {
+    let tokens = token_positions(input);
+    if tokens.is_empty() {
+      return Vec::new();
+    }
+    let mut results = Vec::new();
+    let mut seen = HashSet::new();
+    let step = (self
+      .max_tokens
+      .saturating_sub(self.overlap))
+    .max(1);
+    let mut cursor = 0;
+    while cursor < tokens.len() {
+      let end = (cursor
+        + self.max_tokens)
+        .min(tokens.len());
+      let start_pos =
+        tokens[cursor].start;
+      let end_pos = tokens[end - 1].end;
+      let candidate =
+        &input[start_pos..end_pos];
+      if let Some(chunk) = self.segment(
+        start_pos,
+        doc_id,
+        candidate,
+        ChunkStrategy::Fixed,
+        &mut seen
+      ) {
+        results.push(chunk);
+      }
+      if end == tokens.len() {
+        break;
+      }
+      cursor = cursor + step;
+    }
+    results
+  }
+
+  fn segment(
+    &self,
+    absolute_start: usize,
+    doc_id: &str,
+    segment: &str,
+    strategy: ChunkStrategy,
+    seen: &mut HashSet<String>
+  ) -> Option<Chunk> {
+    let trimmed = segment.trim();
+    if trimmed.is_empty()
+      || !seen
+        .insert(trimmed.to_string())
+    {
+      return None;
+    }
+    let trimmed_start = segment.len()
+      - segment.trim_start().len();
+    let trimmed_end =
+      segment.trim_end().len();
+    let start =
+      absolute_start + trimmed_start;
+    let end =
+      absolute_start + trimmed_end;
+    Some(Chunk {
+      id: Uuid::new_v4().to_string(),
+      doc_id: doc_id.to_string(),
+      text: normalization::normalize(
+        trimmed
+      ),
+      start,
+      end,
+      strategy
+    })
+  }
+}
+
+fn skip_newlines(
+  remainder: &str
+) -> usize {
+  remainder
+    .chars()
+    .take_while(|c| {
+      c.is_ascii_whitespace()
+    })
+    .map(|c| c.len_utf8())
+    .sum()
+}
+
+struct TokenBoundary {
+  start: usize,
+  end:   usize
+}
+
+fn token_positions(
+  input: &str
+) -> Vec<TokenBoundary> {
+  let mut positions = Vec::new();
+  let mut start = None;
+  for (idx, ch) in input.char_indices()
+  {
+    if ch.is_whitespace() {
+      if let Some(s) = start.take() {
+        positions.push(TokenBoundary {
+          start: s,
+          end:   idx
+        });
+      }
+    } else if start.is_none() {
+      start = Some(idx);
+    }
+  }
+  if let Some(s) = start {
+    positions.push(TokenBoundary {
+      start: s,
+      end:   input.len()
+    });
+  }
+  positions
+}
