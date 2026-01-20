@@ -2,6 +2,9 @@
 ## [Unreleased]
 
 ### 🐛 Bug Fixes
+- Emit path ([2c6f018](https://github.com/sguzman/oxbed/commit/2c6f018e0d5d4a4c7ec58e66ad856500ff24626c))## [0.5.1] - 2026-01-20
+
+### 🐛 Bug Fixes
 - Chunker ([900b738](https://github.com/sguzman/oxbed/commit/900b7383f791b859c090136ee1bc5e385592563a))
 
 ### 🚀 Features
