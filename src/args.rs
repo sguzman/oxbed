@@ -30,14 +30,14 @@ pub enum Command {
     /// (default: structured)
     #[arg(long, default_value_t = ChunkStrategy::Structured)]
     strategy:        ChunkStrategy,
-    /// Optional path to emit a CSV
-    /// tally of normalized word counts
+    /// Emit a CSV tally of normalized
+    /// word counts to the artifact dir
     #[arg(long)]
-    emit_word_tally: Option<PathBuf>,
-    /// Optional path to emit the fully
-    /// normalized text
+    emit_word_tally: bool,
+    /// Emit the fully normalized text
+    /// to the artifact dir
     #[arg(long)]
-    emit_normalized: Option<PathBuf>
+    emit_normalized: bool
   },
   /// Search the corpus with a query
   /// string

@@ -192,19 +192,26 @@ pub struct Stage1Storage {
   #[serde(
     default = "default_state_file"
   )]
-  pub state_file:  String,
+  pub state_file:   String,
   #[serde(
     default = "default_chunks_file"
   )]
-  pub chunks_file: String
+  pub chunks_file:  String,
+  #[serde(
+    default = "default_artifact_dir"
+  )]
+  pub artifact_dir: String
 }
 
 impl Default for Stage1Storage {
   fn default() -> Self {
     Self {
-      state_file:  default_state_file(),
-      chunks_file: default_chunks_file(
-      )
+      state_file:   default_state_file(
+      ),
+      chunks_file:  default_chunks_file(
+      ),
+      artifact_dir:
+        default_artifact_dir()
     }
   }
 }
@@ -313,6 +320,10 @@ fn default_state_file() -> String {
 
 fn default_chunks_file() -> String {
   "data/chunks.jsonl".into()
+}
+
+fn default_artifact_dir() -> String {
+  "data".into()
 }
 
 fn default_context_budget() -> usize {

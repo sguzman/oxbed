@@ -57,9 +57,9 @@ pub fn run(
       ingest(
         &path,
         strategy,
+        emit_word_tally,
+        emit_normalized,
         &config,
-        emit_word_tally.clone(),
-        emit_normalized.clone(),
         &mut state,
         &mut index
       )?;
@@ -108,9 +108,9 @@ pub fn run(
 fn ingest(
   path: &Path,
   strategy: ChunkStrategy,
+  emit_word_tally: bool,
+  emit_normalized: bool,
   config: &Config,
-  emit_word_tally: Option<PathBuf>,
-  emit_normalized: Option<PathBuf>,
   state: &mut State,
   index: &mut VectorIndex
 ) -> Result<()> {
@@ -141,16 +141,36 @@ fn ingest(
       .embedder
       .tfidf_min_freq
   );
+  let artifacts_dir = PathBuf::from(
+    &config.stage1.storage.artifact_dir
+  );
+  let normalized_path =
+    if emit_normalized {
+      Some(
+        artifacts_dir
+          .join("normalized.txt")
+      )
+    } else {
+      None
+    };
+  let word_tally_path =
+    if emit_word_tally {
+      Some(
+        artifacts_dir
+          .join("word_tally.csv")
+      )
+    } else {
+      None
+    };
   let mut normalized_writer =
     if let Some(path) =
-      emit_normalized.as_ref()
+      normalized_path.as_ref()
     {
       ensure_parent(path)?;
       Some(File::create(path)?)
     } else {
       None
     };
-  let word_tally_path = emit_word_tally;
   let mut word_counts =
     if word_tally_path.is_some() {
       Some(HashMap::new())
@@ -260,13 +280,12 @@ fn ingest(
       );
     }
   }
-  if let (Some(path), Some(counts)) =
-    (word_tally_path, word_counts)
-  {
-    ensure_parent(&path)?;
-    emit_word_tally_csv(
-      &path, &counts
-    )?;
+  if let (Some(path), Some(counts)) = (
+    word_tally_path.as_ref(),
+    word_counts.as_ref()
+  ) {
+    ensure_parent(path)?;
+    emit_word_tally_csv(path, counts)?;
   }
   Ok(())
 }
@@ -566,8 +585,8 @@ mod tests {
               .clone(),
             strategy:
               ChunkStrategy::Structured,
-            emit_word_tally: None,
-            emit_normalized: None
+            emit_word_tally: false,
+            emit_normalized: false
           },
           config.clone()
         )?;
@@ -615,8 +634,8 @@ mod tests {
               .clone(),
             strategy:
               ChunkStrategy::Fixed,
-            emit_word_tally: None,
-            emit_normalized: None
+            emit_word_tally: false,
+            emit_normalized: false
           },
           config.clone()
         )?;
