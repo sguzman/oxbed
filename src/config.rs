@@ -1,12 +1,18 @@
 #![allow(dead_code)]
 
-use std::fs;
+use std::{
+  fmt,
+  fs
+};
 
 use anyhow::{
   Context,
   Result
 };
-use serde::Deserialize;
+use serde::{
+  Deserialize,
+  Deserializer
+};
 
 #[derive(Clone, Debug, Deserialize)]
 pub struct Config {
@@ -146,13 +152,111 @@ impl Default for Stage1Chunk {
     }
   }
 }
-#[derive(
-  Clone, Copy, Debug, Deserialize,
-)]
-#[serde(rename_all = "kebab-case")]
+#[derive(Clone, Debug)]
 pub enum EmbedderKind {
   Tf,
-  BagOfWords
+  BagOfWords,
+  Custom {
+    name:    String,
+    version: Option<String>
+  }
+}
+
+impl<'de> Deserialize<'de>
+  for EmbedderKind
+{
+  fn deserialize<D>(
+    deserializer: D
+  ) -> Result<Self, D::Error>
+  where
+    D: Deserializer<'de>
+  {
+    struct EmbedderKindVisitor;
+
+    impl<'de> serde::de::Visitor<'de>
+      for EmbedderKindVisitor
+    {
+      type Value = EmbedderKind;
+
+      fn expecting(
+        &self,
+        formatter: &mut fmt::Formatter<
+          '_
+        >
+      ) -> fmt::Result {
+        formatter.write_str(
+          "tf, bag-of-words, or \
+           custom:<name>[:<version>]"
+        )
+      }
+
+      fn visit_str<E>(
+        self,
+        value: &str
+      ) -> Result<Self::Value, E>
+      where
+        E: serde::de::Error
+      {
+        let normalized =
+          value.trim().to_lowercase();
+        match normalized.as_str() {
+          | "tf" => {
+            Ok(EmbedderKind::Tf)
+          }
+          | "bag-of-words" => {
+            Ok(EmbedderKind::BagOfWords)
+          }
+          | _ if normalized
+            .starts_with("custom:") =>
+          {
+            let parts: Vec<_> =
+              normalized
+                .splitn(3, ':')
+                .collect();
+            let name = parts
+              .get(1)
+              .cloned()
+              .unwrap_or_default();
+            if name.is_empty() {
+              return Err(
+                serde::de::Error::custom(
+                  "custom embedder needs a name"
+                )
+              );
+            }
+            let version = parts
+              .get(2)
+              .and_then(|v| {
+                if v.is_empty() {
+                  None
+                } else {
+                  Some(v.to_string())
+                }
+              });
+            Ok(EmbedderKind::Custom {
+              name: name.to_string(),
+              version
+            })
+          }
+          | _ => {
+            Err(
+              serde::de::Error::custom(
+                format!(
+                  "unknown embedder \
+                   kind '{}'",
+                  value
+                )
+              )
+            )
+          }
+        }
+      }
+    }
+
+    deserializer.deserialize_str(
+      EmbedderKindVisitor
+    )
+  }
 }
 
 #[derive(Clone, Debug, Deserialize)]
@@ -395,19 +499,46 @@ pub enum Stage3RerankMode {
 #[derive(Clone, Debug, Deserialize)]
 pub struct Stage4Config {
   #[serde(default = "default_false")]
-  pub enabled:        bool,
+  pub enabled:    bool,
   #[serde(
-    default = "default_checkpoint_dir"
+    default = "default_stage4_models_dir"
   )]
-  pub checkpoint_dir: String
+  pub models_dir: String,
+  #[serde(default)]
+  pub training:   Stage4TrainingConfig
 }
 
 impl Default for Stage4Config {
   fn default() -> Self {
     Self {
-      enabled:        false,
-      checkpoint_dir:
-        default_checkpoint_dir()
+      enabled:    false,
+      models_dir:
+        default_stage4_models_dir(),
+      training:
+        Stage4TrainingConfig::default()
+    }
+  }
+}
+
+#[derive(Clone, Debug, Deserialize)]
+pub struct Stage4TrainingConfig {
+  #[serde(
+    default = "default_stage4_context_budget"
+  )]
+  pub context_budget: usize,
+  #[serde(
+    default = "default_stage4_sample_limit"
+  )]
+  pub sample_limit:   usize
+}
+
+impl Default for Stage4TrainingConfig {
+  fn default() -> Self {
+    Self {
+      context_budget:
+        default_stage4_context_budget(),
+      sample_limit:
+        default_stage4_sample_limit()
     }
   }
 }
@@ -477,6 +608,21 @@ fn default_stage2_embedder_kinds()
     EmbedderKind::Tf,
     EmbedderKind::BagOfWords,
   ]
+}
+
+fn default_stage4_models_dir() -> String
+{
+  "models".into()
+}
+
+fn default_stage4_context_budget()
+-> usize {
+  512
+}
+
+fn default_stage4_sample_limit() -> usize
+{
+  10_000
 }
 
 fn default_stage3_prompt_template()

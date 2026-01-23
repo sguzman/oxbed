@@ -57,14 +57,10 @@ pub fn run_evaluation(
     &config.stage2.embedder_kinds
   {
     let embedder = build_embedder(
-      *kind,
+      kind.clone(),
       config
-        .stage1
-        .embedder
-        .tfidf_min_freq
-    );
-    let embedder_name =
-      embedder.name().to_string();
+    )?;
+    let embedder_name = embedder.name();
     let mut query_reports = Vec::new();
     let mut latencies = Vec::new();
     for query in queries {

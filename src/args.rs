@@ -55,6 +55,20 @@ pub enum Command {
   /// Run the Stage 2 evaluation harness
   Evaluate,
 
+  /// Train a Stage 4 custom embedder
+  Train {
+    /// Name of the model to generate
+    model:   String,
+    /// Optional explicit version for
+    /// the model
+    #[arg(long)]
+    version: Option<String>,
+    /// Optional override for the
+    /// chunks source
+    #[arg(long)]
+    chunks:  Option<PathBuf>
+  },
+
   /// Run the Stage 3 RAG workflow
   Rag {
     /// Query text

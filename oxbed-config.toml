@@ -84,4 +84,8 @@ strategies = [
 [stage4]
 # Custom-training toggles (training loops, checkpoints, manifests).
 enabled = false
-checkpoint_dir = "models/"
+models_dir = "models"
+
+[stage4.training]
+context_budget = 512
+sample_limit = 10000

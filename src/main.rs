@@ -8,6 +8,7 @@ mod normalization;
 mod pipeline;
 mod search;
 mod stage3;
+mod stage4;
 mod state;
 
 use anyhow::Result;

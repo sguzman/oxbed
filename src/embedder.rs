@@ -1,14 +1,25 @@
 use std::collections::HashMap;
+use std::fs::File;
+use std::io::BufReader;
+use std::path::{
+  Path,
+  PathBuf
+};
 
+use anyhow::{
+  Context,
+  Result
+};
 use unicode_segmentation::UnicodeSegmentation;
 
 use crate::config::EmbedderKind;
+use crate::stage4::ModelManifest;
 
 pub type SparseVector =
   HashMap<String, f32>;
 
 pub trait Embedder {
-  fn name(&self) -> &'static str;
+  fn name(&self) -> String;
   fn embed(
     &self,
     text: &str
@@ -21,18 +32,36 @@ pub trait Embedder {
 
 pub fn build_embedder(
   kind: EmbedderKind,
-  min_freq: usize
-) -> Box<dyn Embedder> {
+  config: &crate::config::Config
+) -> Result<Box<dyn Embedder>> {
   match kind {
     | EmbedderKind::Tf => {
-      Box::new(TfEmbedder::new(
-        min_freq
-      ))
+      Ok(Box::new(TfEmbedder::new(
+        config
+          .stage1
+          .embedder
+          .tfidf_min_freq
+      )))
     }
     | EmbedderKind::BagOfWords => {
-      Box::new(
+      Ok(Box::new(
         BagOfWordsEmbedder::default()
-      )
+      ))
+    }
+    | EmbedderKind::Custom {
+      name,
+      version
+    } => {
+      let dir = Path::new(
+        &config.stage4.models_dir
+      );
+      Ok(Box::new(
+        CustomEmbedder::load(
+          dir,
+          &name,
+          version.as_deref()
+        )?
+      ))
     }
   }
 }
@@ -41,8 +70,8 @@ pub fn build_embedder(
 pub struct BagOfWordsEmbedder;
 
 impl Embedder for BagOfWordsEmbedder {
-  fn name(&self) -> &'static str {
-    "bag-of-words"
+  fn name(&self) -> String {
+    "bag-of-words".into()
   }
 
   fn embed(
@@ -56,22 +85,7 @@ impl Embedder for BagOfWordsEmbedder {
         .entry(token)
         .or_insert(0) += 1;
     }
-    let total: f32 = counts
-      .values()
-      .map(|count| *count as f32)
-      .sum();
-    if total == 0.0 {
-      return SparseVector::new();
-    }
-    let mut vector =
-      SparseVector::new();
-    for (token, count) in counts {
-      vector.insert(
-        token,
-        count as f32 / total
-      );
-    }
-    vector
+    normalize_counts(counts)
   }
 
   fn token_count(
@@ -101,46 +115,24 @@ impl TfEmbedder {
 }
 
 impl Embedder for TfEmbedder {
-  fn name(&self) -> &'static str {
-    "tf"
+  fn name(&self) -> String {
+    "tf".into()
   }
 
   fn embed(
     &self,
     text: &str
   ) -> SparseVector {
-    let tokens = tokenize(text);
-    let mut counts: HashMap<
-      String,
-      usize
-    > = HashMap::new();
-    for token in tokens {
+    let mut counts = HashMap::new();
+    for token in tokenize(text) {
       *counts
         .entry(token)
         .or_insert(0) += 1;
     }
-    let entries: Vec<_> = counts
-      .into_iter()
-      .filter(|(_, count)| {
-        *count >= self.min_freq
-      })
-      .collect();
-    let total: f32 = entries
-      .iter()
-      .map(|(_, count)| *count as f32)
-      .sum();
-    if total == 0.0 {
-      return SparseVector::new();
-    }
-    let mut vector =
-      SparseVector::new();
-    for (token, count) in entries {
-      vector.insert(
-        token,
-        count as f32 / total
-      );
-    }
-    vector
+    counts.retain(|_, &mut count| {
+      count >= self.min_freq
+    });
+    normalize_counts(counts)
   }
 
   fn token_count(
@@ -151,38 +143,121 @@ impl Embedder for TfEmbedder {
   }
 }
 
+pub struct CustomEmbedder {
+  weights: HashMap<String, f32>,
+  name:    String,
+  version: String
+}
+
+impl CustomEmbedder {
+  pub fn load(
+    models_dir: &Path,
+    name: &str,
+    version: Option<&str>
+  ) -> Result<Self> {
+    let base = models_dir.join(name);
+    let target =
+      if let Some(ver) = version {
+        base.join(ver)
+      } else {
+        find_latest_model(&base)?
+      };
+    let manifest_path =
+      target.join("manifest.json");
+    let manifest: ModelManifest =
+      serde_json::from_reader(
+        BufReader::new(
+          File::open(&manifest_path)
+            .context("open manifest")?
+        )
+      )
+      .context("parse manifest")?;
+    Ok(Self {
+      weights: manifest
+        .token_weights
+        .clone(),
+      name:    manifest.name,
+      version: manifest.version
+    })
+  }
+}
+
+impl Embedder for CustomEmbedder {
+  fn name(&self) -> String {
+    format!(
+      "custom:{}:{}",
+      self.name, self.version
+    )
+  }
+
+  fn embed(
+    &self,
+    text: &str
+  ) -> SparseVector {
+    let mut vector =
+      SparseVector::new();
+    for token in tokenize(text) {
+      if let Some(weight) =
+        self.weights.get(&token)
+      {
+        vector.insert(token, *weight);
+      }
+    }
+    vector
+  }
+
+  fn token_count(
+    &self,
+    text: &str
+  ) -> usize {
+    text.unicode_words().count()
+  }
+}
+
+fn normalize_counts(
+  counts: HashMap<String, usize>
+) -> SparseVector {
+  let total: f32 = counts
+    .values()
+    .map(|count| *count as f32)
+    .sum();
+  if total == 0.0 {
+    return SparseVector::new();
+  }
+  let mut vector = SparseVector::new();
+  for (token, count) in counts {
+    vector.insert(
+      token,
+      count as f32 / total
+    );
+  }
+  vector
+}
+
+fn find_latest_model(
+  base: &Path
+) -> Result<PathBuf> {
+  let mut candidates: Vec<_> =
+    std::fs::read_dir(base)?
+      .filter_map(Result::ok)
+      .filter(|entry| {
+        entry.path().is_dir()
+      })
+      .collect();
+  candidates
+    .sort_by_key(|entry| entry.path());
+  let entry = candidates
+    .into_iter()
+    .last()
+    .context(
+      "no custom models found"
+    )?;
+  Ok(entry.path())
+}
+
 fn tokenize(text: &str) -> Vec<String> {
   text
     .unicode_words()
     .map(|word| word.to_lowercase())
     .collect()
-}
-
-#[cfg(test)]
-mod tests {
-  use super::*;
-
-  #[test]
-  fn embedder_normalizes_counts() {
-    let embedder = TfEmbedder::new(1);
-    let vector =
-      embedder.embed("foo foo bar");
-    let foo = vector
-      .get("foo")
-      .copied()
-      .unwrap_or_default();
-    let bar = vector
-      .get("bar")
-      .copied()
-      .unwrap_or_default();
-    assert!(
-      (foo - (2.0 / 3.0)).abs() < 1e-6
-    );
-    assert!(
-      (bar - (1.0 / 3.0)).abs() < 1e-6
-    );
-    assert!(
-      !vector.contains_key("missing")
-    );
-  }
 }

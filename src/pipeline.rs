@@ -39,7 +39,8 @@ use crate::state::{
 use crate::{
   evaluation,
   normalization,
-  stage3
+  stage3,
+  stage4
 };
 
 pub fn run(
@@ -56,12 +57,9 @@ pub fn run(
       state.index_entries.clone()
     );
   let embedder = build_embedder(
-    config.stage1.embedder.kind,
-    config
-      .stage1
-      .embedder
-      .tfidf_min_freq
-  );
+    config.stage1.embedder.kind.clone(),
+    &config
+  )?;
   match command {
     | Command::Ingest {
       path,
@@ -114,6 +112,30 @@ pub fn run(
         embedder.as_ref(),
         &config
       )?;
+    }
+    | Command::Train {
+      model,
+      version,
+      chunks
+    } => {
+      let result = stage4::train_model(
+        &config,
+        &model,
+        version.as_deref(),
+        chunks
+          .as_ref()
+          .map(|p| p.as_path())
+      )?;
+      println!(
+        "Trained {} {} → {}",
+        result.manifest.name,
+        result.manifest.version,
+        result.manifest_path.display()
+      );
+      println!(
+        "Training data: {}",
+        result.training_data.display()
+      );
     }
     | Command::Rag {
       query,
@@ -640,12 +662,13 @@ mod tests {
             state.index_entries.clone()
           );
         let embedder = build_embedder(
-          config.stage1.embedder.kind,
           config
             .stage1
             .embedder
-            .tfidf_min_freq
-        );
+            .kind
+            .clone(),
+          &config
+        )?;
         search(
           "gamma",
           3,

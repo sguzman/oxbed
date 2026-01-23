@@ -37,6 +37,7 @@ Release & contribution processes follow `docs/RELEASE.md` and `docs/ai/RUST.md`:
 
 - Implement the ingestion + chunking + query path described in Stage 1 so the CLI and vector store can deliver meaningful search results.
 - Once Stage 1 is stable (v1.0.0), iterate through the later stages documented in `ROADMAP.md`, using the evaluation harness, rerankers, and custom embedder workflows to advance the platform.
+- When you’re ready for Stage 4, run `oxbed train <model>` to generate `models/<model>/<version>/manifest.json` metadata, then add `custom:<model>:<version>` into `stage2.embedder_kinds` so the evaluation harness can compare it against the TF/BoW baselines before pushing towards bespoke embedding training.
 - After Stage 2, enable `stage3.enabled = true` and use `oxbed rag "<your question>"` to rerank hits, build context-limited prompts, and compare multiple reranking strategies before moving on to the LLM/RAG flows of Stage 3.
 - Enable Stage 2 instrumentation by running `oxbed evaluate` (once `stage2.enabled = true` in `oxbed-config.toml`) so you can capture recall@k/MRR/nDCG/latency metrics and write run summaries under `runs/YYYY-MM-DD/`.
 
